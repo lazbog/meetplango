@@ -3,13 +3,21 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"gopkg.in/mgo.v2"
+	"log"
 	"os"
 	"runtime"
 	"strconv"
 	"strings"
 	"time"
+
+	"gopkg.in/mgo.v2"
 )
+
+type Person struct {
+	Name  string
+	Email string
+	Dates []string
+}
 
 func readInput(p string) (int, error) {
 	reader := bufio.NewReader(os.Stdin)
@@ -113,10 +121,43 @@ func addBooking(c map[string]int) (string, error) {
 	return booking[bookingNumber], err
 }
 
-func main() {
-	url := "ds227243.mlab.com:27243/heroku_5n3jl0d2";
-	mgo.Dial(url)
+func DBConnect() (sess *mgo.Session, err error) {
+	uri := "mongodb://meetplango:secret1@ds227243.mlab.com:27243/heroku_5n3jl0d2"
+
+	sess, err = mgo.Dial(uri)
+	if err != nil {
+		return
+	}
+
+	// defer sess.Close()
+	sess.SetSafe(&mgo.Safe{})
 	
+	return
+}
+
+func main() {
+
+	sess, err := DBConnect()
+	if err != nil {
+		fmt.Printf("Can't connect to mongo, go error %v\n", err)
+		return
+	}
+
+	defer sess.Close()
+
+	fmt.Printf("Connection Established")
+
+	collection := sess.DB("").C("user")
+
+	err = collection.Insert(&Person{"Bogdan", "lazbog@tuta.io", []string{"10/10/18", "11/10/18"}},
+		&Person{"Dima", "demonitros@gmail.com", []string{"11/10/18"}})
+	if err != nil {
+		log.Fatal("Problem inserting data: ", err)
+		return
+	} else {
+		fmt.Println("Data is there \n")
+	}
+
 	calendar, err := getCalendar()
 
 	if err != nil {
