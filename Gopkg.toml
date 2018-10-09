@@ -24,6 +24,10 @@
 #   go-tests = true
 #   unused-packages = true
 
+[metadata.heroku]
+  root-package = "github.com/lazbog/meetplango"
+  go-version = "go1.8.1"
+  ensure = "true"
 
 [[constraint]]
   branch = "v2"
