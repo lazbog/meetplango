@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"gopkg.in/mgo.v2"
 	"os"
 	"runtime"
 	"strconv"
@@ -113,6 +114,9 @@ func addBooking(c map[string]int) (string, error) {
 }
 
 func main() {
+	url := "ds227243.mlab.com:27243/heroku_5n3jl0d2";
+	mgo.Dial(url)
+	
 	calendar, err := getCalendar()
 
 	if err != nil {
