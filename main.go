@@ -13,10 +13,16 @@ import (
 	"gopkg.in/mgo.v2"
 )
 
-type Person struct {
+type User struct {
 	Name  string
 	Email string
 	Dates []string
+}
+
+type Meeting struct {
+	Title string
+	Date  string
+	Users []string
 }
 
 func readInput(p string) (int, error) {
@@ -47,7 +53,7 @@ func readInput(p string) (int, error) {
 	return res, err
 }
 
-func getCalendar() (map[string]int, error) {
+func getCalendar() ([]string, error) {
 	dayCounter, err := readInput("Enter a number of days you wish to put statuses for: ")
 	if err != nil {
 		return nil, err
@@ -55,7 +61,7 @@ func getCalendar() (map[string]int, error) {
 
 	if dayCounter <= 10 && dayCounter > 0 {
 		date := time.Now().Local()
-		calendar := make(map[string]int)
+		calendar := []string{}
 		dateAvailable := false
 		for i := 0; i < dayCounter; i++ {
 			humanDate := date.Format("2006-01-02")
@@ -63,8 +69,9 @@ func getCalendar() (map[string]int, error) {
 			if err != nil {
 				return nil, err
 			}
-			calendar[humanDate] = status
+
 			if status == 1 {
+				calendar = append(calendar, humanDate)
 				dateAvailable = true
 			}
 			date = date.AddDate(0, 0, 1)
@@ -74,33 +81,24 @@ func getCalendar() (map[string]int, error) {
 			return getCalendar()
 		}
 
-		return calendar, err
+		return calendar, nil
 	} else {
 		fmt.Println("Please enter a number that is bigger than 0, but less than 10")
 		return getCalendar()
 	}
 }
 
-func addBooking(c map[string]int) (string, error) {
+func addBooking(c []string) (string, error) {
 	if len(c) == 0 {
 		fmt.Print("It seems there are no dates provided")
 		getCalendar()
 	}
-	booking := []string{}
+
 	fmt.Println("Available dates for meeting: ")
 	i := 1
-	for k, v := range c {
-		if v == 1 {
-			booking = append(booking, k)
-			fmt.Printf("%d: %s \n", i, k)
-			i++
-		}
-	}
-
-	bookingCount := len(booking)
-
-	if bookingCount == 1 {
-		return booking[0], nil
+	for _, v := range c {
+		fmt.Printf("%d: %s \n", i, v)
+		i++
 	}
 
 	bookingNumber, err := readInput("Select date you wish to schedule meeting at: ")
@@ -108,6 +106,8 @@ func addBooking(c map[string]int) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
+	bookingCount := len(c)
 
 	if bookingNumber >= 1 && bookingNumber <= bookingCount {
 		bookingNumber--
@@ -118,7 +118,7 @@ func addBooking(c map[string]int) (string, error) {
 		return addBooking(c)
 	}
 
-	return booking[bookingNumber], err
+	return c[bookingNumber], err
 }
 
 func DBConnect() (sess *mgo.Session, err error) {
@@ -131,46 +131,83 @@ func DBConnect() (sess *mgo.Session, err error) {
 
 	// defer sess.Close()
 	sess.SetSafe(&mgo.Safe{})
-	
+
 	return
 }
 
-func main() {
+func DBWrite(c []string, b string, db *mgo.Database) {
+	userC := db.C("user")
+	meetingC := db.C("meeting")
 
+	err := userC.Insert(&User{"Bogdan", "lazbog@tuta.io", c})
+	if err != nil {
+		log.Fatal("Problem inserting userC data: ", err)
+		return
+	} else {
+		fmt.Println("userC data is there")
+	}
+
+	err = meetingC.Insert(&Meeting{"Coding session", b, []string{"Bogdan", "Dima"}})
+	if err != nil {
+		log.Fatal("Problem inserting meetingC data: ", err)
+		return
+	} else {
+		fmt.Println("meetingC data is there")
+	}
+
+}
+
+func DBRead(db *mgo.Database) {
+	userC := db.C("user")
+	meetingC := db.C("meeting")
+
+	var resU []User
+	err := userC.Find(nil).All(&resU)
+
+	if err != nil {
+		log.Fatal("Problem finding the userC data: ", err)
+		return
+	} else {
+		fmt.Println("Results All Users: ", resU)
+	}
+
+	var resM []Meeting
+	err = meetingC.Find(nil).All(&resM)
+
+	if err != nil {
+		log.Fatal("Problem finding the meetingC data: ", err)
+		return
+	} else {
+		fmt.Println("Results All Meeting: ", resM)
+	}
+
+}
+
+func main() {
 	sess, err := DBConnect()
 	if err != nil {
 		fmt.Printf("Can't connect to mongo, go error %v\n", err)
 		return
 	}
-
+	db := sess.DB("")
 	defer sess.Close()
 
-	fmt.Printf("Connection Established")
-
-	collection := sess.DB("").C("user")
-
-	err = collection.Insert(&Person{"Bogdan", "lazbog@tuta.io", []string{"10/10/18", "11/10/18"}},
-		&Person{"Dima", "demonitros@gmail.com", []string{"11/10/18"}})
-	if err != nil {
-		log.Fatal("Problem inserting data: ", err)
-		return
-	} else {
-		fmt.Println("Data is there \n")
-	}
+	fmt.Println("Connection Established")
 
 	calendar, err := getCalendar()
-
 	if err != nil {
 		fmt.Println(err.Error())
 		return
 	}
 
 	result, err := addBooking(calendar)
-
 	if err != nil {
 		fmt.Println(err.Error())
 		return
 	}
+
+	DBWrite(calendar, result, db)
+	DBRead(db)
 
 	fmt.Printf("Booking is scheduled sucessfully at %s \n", result)
 }
